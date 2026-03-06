@@ -280,14 +280,17 @@ async def entrypoint(ctx: agents.JobContext):
         ),
     )
 
-    if has_video:
-        await session.generate_reply(
-            instructions="Greet the user. Let them know you can see their video, generate images with NanoBanana 2, and play real-time music with Lyria."
-        )
-    else:
-        await session.generate_reply(
-            instructions="Greet the user. Let them know you can generate images with NanoBanana 2 and play real-time music with Lyria. Mention they can enable their camera for visual context."
-        )
+    try:
+        if has_video:
+            await session.generate_reply(
+                instructions="Greet the user. Let them know you can see their video, generate images with NanoBanana 2, and play real-time music with Lyria."
+            )
+        else:
+            await session.generate_reply(
+                instructions="Greet the user. Let them know you can generate images with NanoBanana 2 and play real-time music with Lyria. Mention they can enable their camera for visual context."
+            )
+    except Exception as exc:
+        logger.warning("Initial greeting generate_reply failed (agent will respond when user speaks): %s", exc)
 
 
 if __name__ == "__main__":

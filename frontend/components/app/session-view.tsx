@@ -124,7 +124,7 @@ export const SessionView = ({
       {/* Tile layout */}
       <TileLayout chatOpen={chatOpen} />
       {/* Generated image panel — appears when the agent calls generate_image */}
-      <GeneratedImagePanel />
+      <GeneratedImagePanel chatOpen={chatOpen} />
       {/* Bottom */}
       <MotionBottom
         {...BOTTOM_VIEW_MOTION_PROPS}

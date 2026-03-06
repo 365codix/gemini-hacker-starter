@@ -227,7 +227,7 @@ When asked about visuals:
                 self._music_track_pub = None
 
 
-server = AgentServer()
+server = AgentServer(agent_name="gemini-hackathon-agent")
 
 
 @server.rtc_session()

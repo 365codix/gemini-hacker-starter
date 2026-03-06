@@ -12,6 +12,7 @@ import { ChatTranscript } from '@/components/app/chat-transcript';
 import { GeneratedImagePanel } from '@/components/app/generated-image-panel';
 import { ImageGallery } from '@/components/app/image-gallery';
 import { TileLayout } from '@/components/app/tile-layout';
+import { GeneratedImagesProvider } from '@/hooks/useGeneratedImages';
 import { cn } from '@/lib/shadcn/utils';
 import { Shimmer } from '../ai-elements/shimmer';
 
@@ -124,10 +125,13 @@ export const SessionView = ({
       />
       {/* Tile layout */}
       <TileLayout chatOpen={chatOpen} />
-      {/* Generated image panel — appears when the agent calls generate_image */}
-      <GeneratedImagePanel chatOpen={chatOpen} />
-      {/* Gallery — persistent access to all generated images */}
-      <ImageGallery />
+      {/* Single provider registers the byte stream handler once for both image components */}
+      <GeneratedImagesProvider>
+        {/* Generated image panel — appears when the agent calls generate_image */}
+        <GeneratedImagePanel chatOpen={chatOpen} />
+        {/* Gallery — persistent access to all generated images */}
+        <ImageGallery />
+      </GeneratedImagesProvider>
       {/* Bottom */}
       <MotionBottom
         {...BOTTOM_VIEW_MOTION_PROPS}

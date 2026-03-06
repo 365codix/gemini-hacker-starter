@@ -10,6 +10,7 @@ import {
 } from '@/components/agents-ui/agent-control-bar';
 import { ChatTranscript } from '@/components/app/chat-transcript';
 import { GeneratedImagePanel } from '@/components/app/generated-image-panel';
+import { ImageGallery } from '@/components/app/image-gallery';
 import { TileLayout } from '@/components/app/tile-layout';
 import { cn } from '@/lib/shadcn/utils';
 import { Shimmer } from '../ai-elements/shimmer';
@@ -125,6 +126,8 @@ export const SessionView = ({
       <TileLayout chatOpen={chatOpen} />
       {/* Generated image panel — appears when the agent calls generate_image */}
       <GeneratedImagePanel chatOpen={chatOpen} />
+      {/* Gallery — persistent access to all generated images */}
+      <ImageGallery />
       {/* Bottom */}
       <MotionBottom
         {...BOTTOM_VIEW_MOTION_PROPS}

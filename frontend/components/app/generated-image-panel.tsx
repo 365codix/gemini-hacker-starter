@@ -14,7 +14,7 @@ interface ImageCardProps {
 }
 
 function ImageCard({ image, onDismiss }: ImageCardProps) {
-  const src = `data:${image.mimeType};base64,${image.imageData}`;
+  const src = image.imageUrl;
 
   return (
     <MotionPanel

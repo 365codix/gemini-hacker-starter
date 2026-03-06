@@ -1,6 +1,4 @@
 import asyncio
-import base64
-import json
 import logging
 import os
 
@@ -100,19 +98,15 @@ When asked about visuals:
             if image_bytes is None:
                 return "Image generation did not return any image data."
 
-            payload = json.dumps(
-                {
-                    "imageData": base64.b64encode(image_bytes).decode(),
-                    "mimeType": mime_type,
-                    "prompt": prompt,
-                }
-            ).encode()
-
-            await self._room.local_participant.publish_data(
-                payload,
-                reliable=True,
+            writer = await self._room.local_participant.stream_bytes(
+                name="generated-image",
+                mime_type=mime_type,
+                total_size=len(image_bytes),
                 topic="generated-image",
+                attributes={"prompt": prompt},
             )
+            await writer.write(image_bytes)
+            await writer.aclose()
 
             return f"Image generated and sent to the screen. Prompt used: {prompt}"
 
@@ -179,7 +173,7 @@ When asked about visuals:
 
         audio_source = rtc.AudioSource(sample_rate=SAMPLE_RATE, num_channels=NUM_CHANNELS)
         track = rtc.LocalAudioTrack.create_audio_track("lyria-music", audio_source)
-        options = rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_MICROPHONE)
+        options = rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_UNKNOWN)
 
         pub = await self._room.local_participant.publish_track(track, options)
         self._music_track_pub = pub
@@ -190,7 +184,7 @@ When asked about visuals:
                     prompts=[genai_types.WeightedPrompt(text=prompt, weight=1.0)]
                 )
                 await session.set_music_generation_config(
-                    config=genai_types.MusicGenerationConfig(bpm=bpm)
+                    config=genai_types.LiveMusicGenerationConfig(bpm=bpm)
                 )
                 await session.play()
 
@@ -227,10 +221,10 @@ When asked about visuals:
                 self._music_track_pub = None
 
 
-server = AgentServer(agent_name="gemini-hackathon-agent")
+server = AgentServer()
 
 
-@server.rtc_session()
+@server.rtc_session(agent_name="gemini-hackathon-agent")
 async def entrypoint(ctx: agents.JobContext):
     has_video = False
 

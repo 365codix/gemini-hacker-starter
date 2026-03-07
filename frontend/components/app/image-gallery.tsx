@@ -130,7 +130,7 @@ export function ImageGallery() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="fixed inset-y-0 right-0 z-50 flex w-80 flex-col overflow-hidden border-l border-input/50 bg-background shadow-2xl"
+              className="fixed top-0 bottom-0 right-0 z-[60] flex w-80 flex-col overflow-hidden border-l border-input/50 bg-background shadow-2xl md:top-16"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-input/50 px-4 py-3">

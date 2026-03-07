@@ -31,6 +31,8 @@ Your capabilities:
 - start_music: Play real-time generative music with Lyria RealTime. Use this for soundtracks, ambience, or any audio atmosphere.
 - stop_music: Stop the current music.
 
+IMPORTANT: When the user asks you to generate an image, ALWAYS say a brief acknowledgment first (like "On it!" or "Let me create that for you") before calling generate_image. The image takes a few seconds to generate, so the user needs to know you heard them.
+
 Be concise and creative. Lean into the multimodal possibilities — when a user describes something, offer to generate it."""
 
 
@@ -275,22 +277,16 @@ async def entrypoint(ctx: agents.JobContext):
     await session.start(
         room=ctx.room,
         agent=HackathonAgent(room=ctx.room),
-        room_options=room_io.RoomOptions(
-            video_input=True,
-        ),
     )
 
+    await ctx.connect()
+
     try:
-        if has_video:
-            await session.generate_reply(
-                instructions="Greet the user. Let them know you can see their video, generate images with NanoBanana 2, and play real-time music with Lyria."
-            )
-        else:
-            await session.generate_reply(
-                instructions="Greet the user. Let them know you can generate images with NanoBanana 2 and play real-time music with Lyria. Mention they can enable their camera for visual context."
-            )
+        await session.generate_reply(
+            instructions="Greet the user. Let them know you can generate images with NanoBanana 2 and play real-time music with Lyria. Mention they can enable their camera for visual context."
+        )
     except Exception as exc:
-        logger.warning("Initial greeting generate_reply failed (agent will respond when user speaks): %s", exc)
+        logger.warning("Initial greeting failed: %s", exc)
 
 
 if __name__ == "__main__":

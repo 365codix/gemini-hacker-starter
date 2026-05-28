@@ -1,3 +1,4 @@
 livekit-agents[google]>=1.0
 aiohttp
 python-dotenv~=1.0
+av

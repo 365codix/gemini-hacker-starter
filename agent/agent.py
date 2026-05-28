@@ -27,7 +27,6 @@ class CivixHerramientas(llm.FunctionContext):
             async with aiohttp.ClientSession() as session:
                 url = f"{LARAVEL_BACKEND_URL}/api/agente/transferir-llamada"
                 payload = {"distrito": distrito, "tenant_id": self.tenant_id}
-                # Aquí puedes hacer un session.post() cuando la ruta esté 100% lista.
                 return f"La llamada ha sido enrutada con éxito a la central de {distrito}. Despídete amablemente, indícale al usuario que espere en la línea y finaliza la conversación."
         except Exception as e:
             logger.error(f"Error transfiriendo: {e}")
@@ -63,13 +62,13 @@ async def entrypoint(ctx: JobContext):
         f"Si acepta o dice que sí quiere {distrito}, usa inmediatamente tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
         f"Si pide un distrito diferente, usa `transferir_llamada` con ese nuevo distrito. "
         f"Responde siempre directo al grano y muy corto. NUNCA te vuelvas a presentar. "
-        f"IMPORTANTE: Habla siempre a un ritmo rápido, fluido y dinámico. Evita pausas largas y acelera tu forma de hablar." # <-- Nueva instrucción para la velocidad
+        f"IMPORTANTE: Habla siempre a un ritmo muy rápido, fluido y dinámico. Evita pausas largas y acelera tu forma de hablar."
     )
 
     model = google.beta.realtime.RealtimeModel(
         model="models/gemini-2.5-flash-native-audio-preview-12-2025",
-        voice="Aoede", # Voz con mejor volumen y proyección
-        temperature=0.6,
+        voice="Kore", # <-- Voz FEMENINA, energética y rápida
+        temperature=0.4, # <-- Temperatura baja para respuestas directas
         instructions=instructions
     )
 

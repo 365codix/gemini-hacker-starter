@@ -60,7 +60,7 @@ async def entrypoint(ctx: JobContext):
         f"Eres Civix, la inteligencia artificial de la central de Serenazgo. "
         f"El usuario que acaba de conectarse llama desde el distrito de '{distrito}'. "
         f"Al iniciar, tu primer y único mensaje debe ser EXACTAMENTE el siguiente: "
-        f"'Hola, te has comunicado a la central de Serenazgo de {distrito}, ¿desea que lo transfiera a esa central de emergencia para que un operador lo atienda o prefiere que le comuniquemos con otro distrito de la provincia de Arequipa?'. "
+        f"'Hola soy Civix, te has comunicado a la central de Serenazgo de {distrito}, ¿desea que lo transfiera a esa central de emergencia para que un operador lo atienda o prefiere que le comuniquemos con otro distrito de la provincia de Arequipa?'. "
         f"Luego, escucha atentamente. Si acepta o confirma el distrito actual, usa tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
         f"Si pide un distrito diferente, pregúntale cuál y luego usa `transferir_llamada` con ese distrito. "
         f"Si el usuario pide algo no relacionado, recuérdale amablemente que eres una central de emergencias. "
@@ -82,12 +82,14 @@ async def entrypoint(ctx: JobContext):
     )
     agent.start(ctx.room, participant)
 
-    # Empujamos un mensaje interno para FORZAR a que la IA hable primero inmediatamente
+    # Empujamos un mensaje interno para FORZAR a que la IA hable primero
     logger.info("Forzando saludo inicial de Civix...")
     agent.chat_ctx.append(
-        role="user", 
-        text="Acabo de entrar a la llamada. Por favor, dime tu saludo inicial inmediatamente tal y como dicen tus instrucciones."
+        role="user",
+        text="¡Hola! Ya estoy aquí. Salúdame ahora mismo usando tus instrucciones."
     )
+    # Obligamos al agente a generar audio de inmediato
+    await agent.generate_reply()
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

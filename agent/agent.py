@@ -14,7 +14,7 @@ async def entrypoint(ctx: JobContext):
 
     # Iniciar el modelo Multimodal de Gemini Flash (Ultra rápido y económico)
     model = google.beta.realtime.RealtimeModel(
-        model="models/gemini-2.0-flash",
+        model="models/gemini-2.5-flash-native-audio-preview-12-2025",
         voice="Aoede", # Opciones: Puck, Charon, Kore, Fenrir, Aoede
         temperature=0.7,
         instructions="Eres Civix, la asistente virtual de la central de emergencias. Escucha al ciudadano, averigua qué emergencia tiene y dile que un operador humano tomará su llamada de inmediato."

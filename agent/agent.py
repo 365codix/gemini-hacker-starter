@@ -24,12 +24,11 @@ class CivixHerramientas(llm.FunctionContext):
     ):
         logger.info(f"Intentando transferir llamada al distrito: {distrito} desde el tenant: {self.tenant_id}")
         try:
-            # Aquí llamaremos a tu Laravel en el siguiente paso
             async with aiohttp.ClientSession() as session:
                 url = f"{LARAVEL_BACKEND_URL}/api/agente/transferir-llamada"
                 payload = {"distrito": distrito, "tenant_id": self.tenant_id}
-                # Por ahora solo simularemos el éxito hasta que agreguemos la ruta en Laravel
-                return f"La llamada ha sido enrutada con éxito a la central de {distrito}. Despídete amablemente y dile al usuario que espere en línea."
+                # Aquí puedes hacer un session.post() cuando la ruta esté 100% lista.
+                return f"La llamada ha sido enrutada con éxito a la central de {distrito}. Despídete amablemente, indícale al usuario que espere en la línea y finaliza la conversación."
         except Exception as e:
             logger.error(f"Error transfiriendo: {e}")
             return "Error del sistema al intentar transferir la llamada. Pídele al usuario que intente de nuevo en un momento."
@@ -55,21 +54,20 @@ async def entrypoint(ctx: JobContext):
     except Exception as e:
         logger.warning(f"No se detectó metadata de distrito: {e}. Usando fallback.")
 
-    # Instrucciones estrictas para el Modelo
+    # Instrucciones estrictas (Enfoque Zero-Tokens: el navegador ya hizo el saludo largo)
     instructions = (
         f"Eres Civix, la inteligencia artificial de la central de Serenazgo. "
-        f"El usuario que acaba de conectarse llama desde el distrito de '{distrito}'. "
-        f"Al iniciar, tu primer y único mensaje debe ser EXACTAMENTE el siguiente: "
-        f"'Hola soy Civix, te has comunicado a la central de Serenazgo de {distrito}, ¿desea que lo transfiera a esa central de emergencia para que un operador lo atienda o prefiere que le comuniquemos con otro distrito de la provincia de Arequipa?'. "
-        f"Luego, escucha atentamente. Si acepta o confirma el distrito actual, usa tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
-        f"Si pide un distrito diferente, pregúntale cuál y luego usa `transferir_llamada` con ese distrito. "
-        f"Si el usuario pide algo no relacionado, recuérdale amablemente que eres una central de emergencias. "
-        f"Habla siempre en español con voz amable, clara y rápida."
+        f"Al usuario que acaba de conectarse ya se le dio la bienvenida automáticamente y "
+        f"la máquina le acaba de preguntar: '¿Desea que lo transfiera a la central de {distrito} o prefiere otro distrito?'. "
+        f"Tu tarea principal es escuchar SU RESPUESTA a esa pregunta que ya escuchó. "
+        f"Si acepta o dice que sí quiere {distrito}, usa inmediatamente tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
+        f"Si pide un distrito diferente, usa `transferir_llamada` con ese nuevo distrito. "
+        f"Responde siempre directo al grano, confirmando la acción de forma muy corta y amable. NUNCA te vuelvas a presentar."
     )
 
     model = google.beta.realtime.RealtimeModel(
         model="models/gemini-2.5-flash-native-audio-preview-12-2025",
-        voice="Aoede", 
+        voice="Aoede", # Voz con mejor volumen y proyección
         temperature=0.6,
         instructions=instructions
     )
@@ -80,29 +78,10 @@ async def entrypoint(ctx: JobContext):
         model=model,
         fnc_ctx=fnc_ctx
     )
+    
+    # Iniciamos el agente y lo dejamos esperando tranquilamente la respuesta del usuario
+    logger.info("Iniciando agente. Esperando respuesta del ciudadano al TTS del navegador...")
     agent.start(ctx.room, participant)
-
-    # Empujamos un mensaje interno para FORZAR a que la IA hable primero
-    logger.info("Forzando saludo inicial de Civix...")
-    agent.chat_ctx.append(
-        role="user",
-        text="¡Hola! Ya estoy aquí. Salúdame ahora mismo usando tus instrucciones."
-    )
-    # Iniciar el agente
-    agent.start(ctx.room, participant)
-
-    # Pausa de seguridad
-    logger.info("Esperando conexión de audio...")
-    await asyncio.sleep(2.0)
-
-    # Forzamos a la IA a hablar pasándole la instrucción DIRECTAMENTE al disparador
-    logger.info("Forzando saludo inicial de Civix...")
-    try:
-        await agent.generate_reply(
-            instructions="Acabo de conectarme a la llamada. Salúdame INMEDIATAMENTE repitiendo tu saludo exacto para Arequipa."
-        )
-    except Exception as e:
-        logger.error(f"Error forzando saludo: {e}")
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

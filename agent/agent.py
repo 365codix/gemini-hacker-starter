@@ -65,34 +65,31 @@ async def entrypoint(ctx: JobContext):
         f"REGLA CRÍTICA: Habla siempre a un ritmo muy rápido, fluido y dinámico."
     )
 
+    # CAMBIO 1: Modelo que soporta Realtime y Transcripción (evita que crashee el plugin)
     model = google.beta.realtime.RealtimeModel(
-        model="models/gemini-2.5-flash-native-audio-preview-12-2025",
+        model="models/gemini-2.0-flash-exp",
         voice="Kore", # <-- Voz FEMENINA, enérgica y fluida
         temperature=0.4,
         instructions=instructions
     )
 
-    # Crear agente conectando las herramientas (Tools)
-    fnc_ctx = CivixHerramientas(tenant_id=tenant_id)
-    agent = MultimodalAgent(
-        model=model,
-        fnc_ctx=fnc_ctx
-    )
-
-    # Empujamos un contexto interno indicando que acaba de entrar el usuario
-    agent.chat_ctx.append(
+    # CAMBIO 2: Crear el contexto ANTES de instanciar el agente para forzar a que hable primero
+    chat_ctx = llm.ChatContext()
+    chat_ctx.append(
         role="user",
         text="Acaba de conectarse la llamada. Di INMEDIATAMENTE tu mensaje de saludo exacto y hazme la pregunta, no esperes a que yo hable."
     )
-    
-    # Iniciamos el agente
+
+    # Crear agente conectando herramientas e inyectándole el contexto inicial
+    fnc_ctx = CivixHerramientas(tenant_id=tenant_id)
+    agent = MultimodalAgent(
+        model=model,
+        fnc_ctx=fnc_ctx,
+        chat_ctx=chat_ctx # <-- Pasamos el contexto aquí
+    )
+
+    # Iniciamos el agente (empezará a hablar automáticamente gracias al chat_ctx inyectado)
     agent.start(ctx.room, participant)
-    
-    # Forzamos la generación del audio instantáneamente (sin sleep)
-    try:
-        await agent.generate_reply()
-    except Exception as e:
-        logger.error(f"Error forzando saludo inicial: {e}")
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

@@ -91,17 +91,18 @@ async def entrypoint(ctx: JobContext):
     # Iniciar el agente
     agent.start(ctx.room, participant)
 
-    # 1. Pausa de seguridad para que LiveKit conecte bien el audio del celular
+    # Pausa de seguridad
     logger.info("Esperando conexión de audio...")
-    await asyncio.sleep(1.5)
+    await asyncio.sleep(2.0)
 
-    # 2. Forzamos a la IA a hablar
+    # Forzamos a la IA a hablar pasándole la instrucción DIRECTAMENTE al disparador
     logger.info("Forzando saludo inicial de Civix...")
-    agent.chat_ctx.append(
-        role="user",
-        text="¡Hola! Acabo de entrar a la llamada. Por favor, dime tu saludo inicial inmediatamente tal como está en tus instrucciones."
-    )
-    await agent.generate_reply()
+    try:
+        await agent.generate_reply(
+            instructions="Acabo de conectarme a la llamada. Salúdame INMEDIATAMENTE repitiendo tu saludo exacto para Arequipa."
+        )
+    except Exception as e:
+        logger.error(f"Error forzando saludo: {e}")
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

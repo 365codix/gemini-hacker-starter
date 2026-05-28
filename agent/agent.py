@@ -62,7 +62,8 @@ async def entrypoint(ctx: JobContext):
         f"Tu tarea principal es escuchar SU RESPUESTA a esa pregunta que ya escuchó. "
         f"Si acepta o dice que sí quiere {distrito}, usa inmediatamente tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
         f"Si pide un distrito diferente, usa `transferir_llamada` con ese nuevo distrito. "
-        f"Responde siempre directo al grano, confirmando la acción de forma muy corta y amable. NUNCA te vuelvas a presentar."
+        f"Responde siempre directo al grano y muy corto. NUNCA te vuelvas a presentar. "
+        f"IMPORTANTE: Habla siempre a un ritmo rápido, fluido y dinámico. Evita pausas largas y acelera tu forma de hablar." # <-- Nueva instrucción para la velocidad
     )
 
     model = google.beta.realtime.RealtimeModel(

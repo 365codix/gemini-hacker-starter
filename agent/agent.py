@@ -2,7 +2,8 @@ import asyncio
 import os
 import json
 import logging
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, Agent, AgentSession, llm
+from typing import Annotated
+from livekit.agents import Agent, AgentSession, AutoSubscribe, JobContext, RunContext, WorkerOptions, cli, function_tool
 from livekit.plugins import google
 import aiohttp
 
@@ -11,28 +12,45 @@ logger = logging.getLogger("civix-agente")
 LARAVEL_BACKEND_URL = os.getenv("LARAVEL_BACKEND_URL", "https://alerta.civix.pe")
 
 
-class CivixHerramientas(llm.FunctionContext):
-    """Herramientas que puede invocar la IA durante la conversación."""
+class CivixAgent(Agent):
+    def __init__(self, distrito: str, tenant_id: str):
+        self._distrito = distrito
+        self._tenant_id = tenant_id
 
-    def __init__(self, tenant_id: str):
-        super().__init__()
-        self.tenant_id = tenant_id
+        instructions = (
+            f"Eres Civix, la inteligencia artificial de la central de Serenazgo. "
+            f"IMPORTANTE: Tu primer mensaje absoluto apenas inicie la conversación DEBE SER EXACTAMENTE ESTE: "
+            f"'Hola, te has comunicado a la central de Serenazgo de {distrito}, "
+            f"¿desea que lo transfiera a esa central de emergencia para que un operador lo atienda "
+            f"o prefiere que le comuniquemos con otro distrito de la provincia de arequipa?'. "
+            f"Una vez que digas eso, escucha su respuesta. "
+            f"Si acepta {distrito}, usa inmediatamente tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
+            f"Si pide un distrito diferente, usa `transferir_llamada` con ese nuevo distrito. "
+            f"Responde siempre directo al grano y muy corto. "
+            f"REGLA CRÍTICA: Habla siempre a un ritmo muy rápido, fluido y dinámico."
+        )
 
-    @llm.ai_callable(
-        description="Transfiere la llamada a la central de serenazgo. "
-                    "Llama a esta función ÚNICAMENTE cuando el ciudadano ACEPTE ser transferido."
-    )
+        super().__init__(instructions=instructions)
+
+    async def on_enter(self) -> None:
+        """Se ejecuta automáticamente cuando el agente se activa."""
+        logger.info("Agente activado, enviando saludo inicial...")
+        await self.session.generate_reply(
+            instructions="Di INMEDIATAMENTE tu mensaje de saludo exacto y hazme la pregunta. No esperes a que el usuario hable primero."
+        )
+
+    @function_tool()
     async def transferir_llamada(
         self,
-        distrito: str = llm.TypeInfo(
-            description="El nombre del distrito al que se va a transferir la llamada, tal cual lo dijo el usuario."
-        ),
-    ):
-        logger.info(f"Intentando transferir llamada al distrito: {distrito} desde el tenant: {self.tenant_id}")
+        ctx: RunContext,
+        distrito: Annotated[str, "El nombre del distrito al que se va a transferir la llamada, tal cual lo dijo el usuario."],
+    ) -> str:
+        """Transfiere la llamada a la central de serenazgo. Llama a esta función ÚNICAMENTE cuando el ciudadano ACEPTE ser transferido."""
+        logger.info(f"Intentando transferir llamada al distrito: {distrito} desde el tenant: {self._tenant_id}")
         try:
             async with aiohttp.ClientSession() as session:
                 url = f"{LARAVEL_BACKEND_URL}/api/agente/transferir-llamada"
-                payload = {"distrito": distrito, "tenant_id": self.tenant_id}
+                payload = {"distrito": distrito, "tenant_id": self._tenant_id}
                 # Aquí puedes hacer el POST real si lo necesitas:
                 # async with session.post(url, json=payload) as resp:
                 #     data = await resp.json()
@@ -66,45 +84,21 @@ async def entrypoint(ctx: JobContext):
     except Exception as e:
         logger.warning(f"No se detectó metadata de distrito: {e}. Usando fallback.")
 
-    # Instrucciones del agente
-    instructions = (
-        f"Eres Civix, la inteligencia artificial de la central de Serenazgo. "
-        f"IMPORTANTE: Tu primer mensaje absoluto apenas inicie la conversación DEBE SER EXACTAMENTE ESTE: "
-        f"'Hola, te has comunicado a la central de Serenazgo de {distrito}, "
-        f"¿desea que lo transfiera a esa central de emergencia para que un operador lo atienda "
-        f"o prefiere que le comuniquemos con otro distrito de la provincia de arequipa?'. "
-        f"Una vez que digas eso, escucha su respuesta. "
-        f"Si acepta {distrito}, usa inmediatamente tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
-        f"Si pide un distrito diferente, usa `transferir_llamada` con ese nuevo distrito. "
-        f"Responde siempre directo al grano y muy corto. "
-        f"REGLA CRÍTICA: Habla siempre a un ritmo muy rápido, fluido y dinámico."
-    )
+    # Crear el agente con herramientas integradas
+    agent = CivixAgent(distrito=distrito, tenant_id=tenant_id)
 
-    # Herramientas
-    fnc_ctx = CivixHerramientas(tenant_id=tenant_id)
-
-    # Crear el Agente con instrucciones
-    agent = Agent(instructions=instructions)
-
-    # Crear la sesión con el modelo Realtime de Google (SIN el transcriber problemático)
+    # Crear la sesión con el modelo Realtime de Google
     session = AgentSession(
         llm=google.realtime.RealtimeModel(
             model="gemini-2.5-flash-native-audio-preview",
             voice="Kore",
             temperature=0.4,
         ),
-        fnc_ctx=fnc_ctx,
     )
 
-    # Iniciar la sesión (conecta al agente con la sala)
+    # Iniciar (on_enter se ejecuta automáticamente y lanza el saludo)
     await session.start(room=ctx.room, agent=agent)
-    logger.info("Agente iniciado correctamente.")
-
-    # Forzar el saludo inicial inmediato
-    await session.generate_reply(
-        instructions="Di INMEDIATAMENTE tu mensaje de saludo exacto y hazme la pregunta. No esperes a que el usuario hable primero."
-    )
-    logger.info("Saludo inicial enviado.")
+    logger.info("Sesión iniciada correctamente.")
 
 
 if __name__ == "__main__":

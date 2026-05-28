@@ -53,22 +53,22 @@ async def entrypoint(ctx: JobContext):
     except Exception as e:
         logger.warning(f"No se detectó metadata de distrito: {e}. Usando fallback.")
 
-    # Instrucciones estrictas (Enfoque Zero-Tokens: el navegador ya hizo el saludo largo)
+    # Instrucciones estrictas
     instructions = (
         f"Eres Civix, la inteligencia artificial de la central de Serenazgo. "
-        f"Al usuario que acaba de conectarse ya se le dio la bienvenida automáticamente y "
-        f"la máquina le acaba de preguntar: '¿Desea que lo transfiera a la central de {distrito} o prefiere otro distrito?'. "
-        f"Tu tarea principal es escuchar SU RESPUESTA a esa pregunta que ya escuchó. "
-        f"Si acepta o dice que sí quiere {distrito}, usa inmediatamente tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
+        f"IMPORTANTE: Tu primer mensaje absoluto apenas inicie la conversación DEBE SER EXACTAMENTE ESTE: "
+        f"'Hola, te has comunicado a la central de Serenazgo de {distrito}, ¿desea que lo transfiera a esa central de emergencia para que un operador lo atienda o prefiere que le comuniquemos con otro distrito de la provincia de arequipa?'. "
+        f"Una vez que digas eso, escucha su respuesta. "
+        f"Si acepta {distrito}, usa inmediatamente tu herramienta `transferir_llamada` pasando el distrito '{distrito}'. "
         f"Si pide un distrito diferente, usa `transferir_llamada` con ese nuevo distrito. "
-        f"Responde siempre directo al grano y muy corto. NUNCA te vuelvas a presentar. "
-        f"IMPORTANTE: Habla siempre a un ritmo muy rápido, fluido y dinámico. Evita pausas largas y acelera tu forma de hablar."
+        f"Responde siempre directo al grano y muy corto. "
+        f"REGLA CRÍTICA: Habla siempre a un ritmo muy rápido, fluido y dinámico."
     )
 
     model = google.beta.realtime.RealtimeModel(
         model="models/gemini-2.5-flash-native-audio-preview-12-2025",
-        voice="Aoede", # <-- Voz FEMENINA, energética y rápida
-        temperature=0.6, # <-- Temperatura baja para respuestas directas
+        voice="Kore", # <-- Voz FEMENINA, enérgica y fluida
+        temperature=0.4,
         instructions=instructions
     )
 
@@ -78,10 +78,21 @@ async def entrypoint(ctx: JobContext):
         model=model,
         fnc_ctx=fnc_ctx
     )
+
+    # Empujamos un contexto interno indicando que acaba de entrar el usuario
+    agent.chat_ctx.append(
+        role="user",
+        text="Acaba de conectarse la llamada. Di INMEDIATAMENTE tu mensaje de saludo exacto y hazme la pregunta, no esperes a que yo hable."
+    )
     
-    # Iniciamos el agente y lo dejamos esperando tranquilamente la respuesta del usuario
-    logger.info("Iniciando agente. Esperando respuesta del ciudadano al TTS del navegador...")
+    # Iniciamos el agente
     agent.start(ctx.room, participant)
+    
+    # Forzamos la generación del audio instantáneamente (sin sleep)
+    try:
+        await agent.generate_reply()
+    except Exception as e:
+        logger.error(f"Error forzando saludo inicial: {e}")
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

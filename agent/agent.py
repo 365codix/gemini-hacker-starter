@@ -69,7 +69,7 @@ async def entrypoint(ctx: JobContext):
 
     model = google.beta.realtime.RealtimeModel(
         model="models/gemini-2.5-flash-native-audio-preview-12-2025",
-        voice="Aoede", 
+        voice="Puck", 
         temperature=0.6,
         instructions=instructions
     )
@@ -88,7 +88,19 @@ async def entrypoint(ctx: JobContext):
         role="user",
         text="¡Hola! Ya estoy aquí. Salúdame ahora mismo usando tus instrucciones."
     )
-    # Obligamos al agente a generar audio de inmediato
+    # Iniciar el agente
+    agent.start(ctx.room, participant)
+
+    # 1. Pausa de seguridad para que LiveKit conecte bien el audio del celular
+    logger.info("Esperando conexión de audio...")
+    await asyncio.sleep(1.5)
+
+    # 2. Forzamos a la IA a hablar
+    logger.info("Forzando saludo inicial de Civix...")
+    agent.chat_ctx.append(
+        role="user",
+        text="¡Hola! Acabo de entrar a la llamada. Por favor, dime tu saludo inicial inmediatamente tal como está en tus instrucciones."
+    )
     await agent.generate_reply()
 
 if __name__ == "__main__":

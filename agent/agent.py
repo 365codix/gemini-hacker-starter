@@ -90,7 +90,7 @@ async def entrypoint(ctx: JobContext):
     # Crear la sesión con el modelo Realtime de Google
     session = AgentSession(
         llm=google.realtime.RealtimeModel(
-            model="gemini-2.5-flash-native-audio-preview",
+            model="gemini-2.5-flash-live-preview",
             voice="Kore",
             temperature=0.4,
         ),

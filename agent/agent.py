@@ -20,9 +20,12 @@ async def entrypoint(ctx: JobContext):
         instructions="Eres Civix, la asistente virtual de la central de emergencias. Escucha al ciudadano, averigua qué emergencia tiene y dile que un operador humano tomará su llamada de inmediato."
     )
 
+    # Esperar a que el usuario entre a la sala
+    participant = await ctx.wait_for_participant()
+
     # Conectar el agente multimodal a la sala
     agent = MultimodalAgent(model=model)
-    agent.start(ctx.room, ctx.participant)
+    agent.start(ctx.room, participant)
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

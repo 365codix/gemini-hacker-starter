@@ -68,7 +68,7 @@ async def entrypoint(ctx: JobContext):
     model = google.beta.realtime.RealtimeModel(
         model="models/gemini-2.5-flash-native-audio-preview-12-2025",
         voice="Aoede", # <-- Voz FEMENINA, energética y rápida
-        temperature=0.4, # <-- Temperatura baja para respuestas directas
+        temperature=0.6, # <-- Temperatura baja para respuestas directas
         instructions=instructions
     )
 

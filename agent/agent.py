@@ -35,6 +35,7 @@ class CivixAgent(Agent):
         self._silence_task: Optional[asyncio.Task] = None
         self._silence_prompts = 0
         self._invalid_district_attempts = 0
+        self._directory_shutdown_delay = 22
 
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
@@ -186,12 +187,13 @@ class CivixAgent(Agent):
                             self._closed = True
                             distrito_ref = body.get("distrito_solicitado") or distrito
                             telefonos = [str(t) for t in body.get("telefonos", []) if str(t).strip()]
-                            numeros = ", ".join(telefonos) if telefonos else "no disponible"
+                            numeros = " y ".join(telefonos) if telefonos else "no disponible"
+                            self._directory_shutdown_delay = max(18, 10 + (len(telefonos) * 6))
                             asyncio.create_task(self._shutdown_after_directory())
                             return (
-                                f"{distrito_ref} aun no esta disponible para transferencia. "
-                                f"Dicta estos telefonos de referencia lentamente: {numeros}. "
-                                "Indica que debe llamar directamente y finaliza."
+                                f"No puedo transferirte a {distrito_ref}. "
+                                f"Anota estos telefonos: {numeros}. "
+                                "Debes llamar directamente. Luego despídete."
                             )
 
                         self._invalid_district_attempts += 1
@@ -229,7 +231,7 @@ class CivixAgent(Agent):
         await self._shutdown_session()
 
     async def _shutdown_after_directory(self) -> None:
-        await asyncio.sleep(8)
+        await asyncio.sleep(self._directory_shutdown_delay)
         await self._notificar_cierre_backend("directorio_telefonico")
         logger.info("Telefonos de directorio entregados; cerrando sesion.")
         await self._shutdown_session()

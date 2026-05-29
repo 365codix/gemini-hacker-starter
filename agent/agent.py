@@ -35,6 +35,7 @@ class CivixAgent(Agent):
         self._silence_task: Optional[asyncio.Task] = None
         self._silence_prompts = 0
         self._invalid_district_attempts = 0
+        self._silence_timeout_seconds = 4
         self._directory_shutdown_delay = 22
 
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
@@ -99,7 +100,7 @@ class CivixAgent(Agent):
 
     async def _handle_silence_timeout(self) -> None:
         try:
-            await asyncio.sleep(7)
+            await asyncio.sleep(self._silence_timeout_seconds)
             if self._transfer_done or self._closed:
                 return
 

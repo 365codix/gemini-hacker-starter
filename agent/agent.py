@@ -36,30 +36,27 @@ class CivixAgent(Agent):
         self._silence_prompts = 0
         self._invalid_district_attempts = 0
 
-        distritos = self._format_districts()
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
             first_prompt = (
-                f"Hola, te has comunicado a la central de Serenazgo de {destino_detectado}. "
-                f"¿Deseas que te transfiera a esta central o prefieres otro distrito disponible: {distritos}?"
+                f"Serenazgo {destino_detectado}. ¿Te transfiero aquí o a otro distrito?"
             )
             routing_rule = (
                 f"Si acepta esta central, llama `transferir_llamada` con '{destino_detectado}'. "
-                f"Si pide otro distrito, solo transfiere si coincide exactamente con uno de estos: {distritos}."
+                "Si pide otro distrito, llama `transferir_llamada` con el distrito que diga el ciudadano."
             )
         else:
             first_prompt = (
-                f"Hola, no pude detectar una central con cobertura para tu ubicación. "
-                f"Puedo comunicarte con estos distritos disponibles: {distritos}. ¿A cuál deseas que te transfiera?"
+                "No detecté tu distrito. ¿A qué central de serenazgo deseas comunicarte?"
             )
-            routing_rule = f"Solo transfiere si el ciudadano elige exactamente uno de estos distritos disponibles: {distritos}."
+            routing_rule = "Llama `transferir_llamada` con el distrito que diga el ciudadano."
 
         instructions = (
             "Eres Civix, la inteligencia artificial de la central de Serenazgo. "
             f"Tu primer mensaje absoluto debe ser: '{first_prompt}'. "
             f"{routing_rule} "
-            "Si el ciudadano pide un distrito que no está disponible, NO transfieras: dile brevemente que ese distrito aún no está en la plataforma "
-            f"y ofrece solo estas opciones: {distritos}. "
+            "Si el backend devuelve telefonos de referencia, dicta los numeros lentamente y avisa que no puedes transferir a ese distrito por ahora. "
+            "Si el backend indica distrito no disponible sin telefonos, dilo brevemente y pregunta si desea otra central. "
             "Si el ciudadano no responde a la pregunta de transferencia, se le repreguntará una sola vez y luego el sistema cerrará la llamada. "
             "Responde siempre directo al grano, muy corto y con ritmo rápido. "
             "Después de usar `transferir_llamada`, no sigas conversando ni agregues instrucciones nuevas."
@@ -109,37 +106,38 @@ class CivixAgent(Agent):
                 self._silence_prompts += 1
                 if self._cobertura_detectada and self._distrito:
                     prompt = (
-                        f"No escuché tu respuesta. ¿Te transfiero a {self._distrito} "
-                        f"o a otro distrito disponible: {self._format_districts()}?"
+                        f"No escuché tu respuesta. ¿Te transfiero a {self._distrito} o a otro distrito?"
                     )
                 else:
                     prompt = (
-                        f"No escuché tu respuesta. Indica uno de estos distritos disponibles: "
-                        f"{self._format_districts()}."
+                        "No escuché tu respuesta. ¿A qué central de serenazgo deseas comunicarte?"
                     )
                 await self.session.generate_reply(instructions=f"Di exactamente: '{prompt}'")
                 self._arm_silence_timer()
                 return
 
-            await self._cerrar_por_silencio()
+            await self._cerrar_llamada(
+                "sin_respuesta",
+                "No recibimos respuesta. Cerraré la llamada. Puedes volver a comunicarte cuando lo necesites.",
+            )
         except asyncio.CancelledError:
             return
         except Exception as e:
             logger.warning(f"Error en temporizador de silencio: {e}")
 
-    async def _cerrar_por_silencio(self) -> None:
+    async def _cerrar_llamada(self, motivo: str, mensaje: str) -> None:
         if self._closed:
             return
         self._closed = True
         self._cancel_silence_timer()
         try:
             await self.session.generate_reply(
-                instructions="Di exactamente: 'No recibimos respuesta. Cerraré la llamada. Puedes volver a comunicarte cuando lo necesites.'"
+                instructions=f"Di exactamente: '{mensaje}'"
             )
         except Exception as e:
-            logger.warning(f"No se pudo anunciar cierre por silencio: {e}")
+            logger.warning(f"No se pudo anunciar cierre de llamada: {e}")
 
-        await self._notificar_cierre_backend("sin_respuesta")
+        await self._notificar_cierre_backend(motivo)
         await asyncio.sleep(0.8)
         await self._shutdown_session()
 
@@ -178,9 +176,30 @@ class CivixAgent(Agent):
                     logger.info(f"Respuesta del backend: {resp.status}")
 
                     if resp.status == 422:
+                        body = {}
+                        try:
+                            body = json.loads(body_text) if body_text else {}
+                        except Exception:
+                            body = {}
+
+                        if body.get("code") == "directorio_telefonico":
+                            self._closed = True
+                            distrito_ref = body.get("distrito_solicitado") or distrito
+                            telefonos = [str(t) for t in body.get("telefonos", []) if str(t).strip()]
+                            numeros = ", ".join(telefonos) if telefonos else "no disponible"
+                            asyncio.create_task(self._shutdown_after_directory())
+                            return (
+                                f"{distrito_ref} aun no esta disponible para transferencia. "
+                                f"Dicta estos telefonos de referencia lentamente: {numeros}. "
+                                "Indica que debe llamar directamente y finaliza."
+                            )
+
                         self._invalid_district_attempts += 1
                         if self._invalid_district_attempts >= 2:
-                            asyncio.create_task(self._cerrar_por_silencio())
+                            asyncio.create_task(self._cerrar_llamada(
+                                "distrito_no_disponible",
+                                "No puedo transferirte a ese distrito por ahora. Cerraré la llamada. Intenta comunicarte por los canales oficiales.",
+                            ))
                             return (
                                 "Ese distrito no esta disponible en la plataforma. "
                                 "Indica que se cerrara la llamada y no hagas mas preguntas."
@@ -188,7 +207,7 @@ class CivixAgent(Agent):
                         self._arm_silence_timer()
                         return (
                             f"Ese distrito no esta disponible en la plataforma. "
-                            f"Ofrece solo estas opciones: {self._format_districts()}."
+                            "Pregunta si desea intentar con otra central."
                         )
 
                     if resp.status >= 400:
@@ -207,6 +226,12 @@ class CivixAgent(Agent):
     async def _shutdown_after_transfer(self) -> None:
         await asyncio.sleep(0.8)
         logger.info("Transferencia completada; cerrando sesion Gemini/LiveKit del agente.")
+        await self._shutdown_session()
+
+    async def _shutdown_after_directory(self) -> None:
+        await asyncio.sleep(8)
+        await self._notificar_cierre_backend("directorio_telefonico")
+        logger.info("Telefonos de directorio entregados; cerrando sesion.")
         await self._shutdown_session()
 
     async def _shutdown_session(self) -> None:

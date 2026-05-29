@@ -54,9 +54,8 @@ class CivixAgent(Agent):
                 async with http_session.post(url, json=payload) as resp:
                     logger.info(f"Respuesta del backend: {resp.status}")
                 return (
-                    f"La llamada ha sido enrutada con éxito a la central de {distrito}. "
-                    f"Despídete amablemente, indícale al usuario que espere en la línea "
-                    f"y finaliza la conversación."
+                    f"Di exactamente: 'Listo, te estoy comunicando con la central de serenazgo de {distrito}. "
+                    f"Mantente en línea para que un operador te atienda.'. Luego finaliza la conversación."
                 )
         except Exception as e:
             logger.error(f"Error transfiriendo: {e}")

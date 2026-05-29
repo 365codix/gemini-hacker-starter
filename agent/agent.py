@@ -41,7 +41,7 @@ class CivixAgent(Agent):
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
             first_prompt = (
-                f"Hola, Seguridad Ciudadana de {destino_detectado}. ¿Te transfiero aquí o a otro distrito?"
+                f"Hola soy tu ex la GIL, de Seguridad Ciudadana de {destino_detectado}. ¿Te transfiero aquí o a otro distrito?"
             )
             routing_rule = (
                 f"Si acepta esta central, llama `transferir_llamada` con '{destino_detectado}'. "

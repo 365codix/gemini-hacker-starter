@@ -248,7 +248,7 @@ class CivixAgent(Agent):
             return "Error del sistema al intentar transferir la llamada. Pidele al usuario que intente de nuevo en un momento."
 
     async def _shutdown_after_transfer(self) -> None:
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(2.5)
         logger.info("Transferencia completada; cerrando sesion Gemini/LiveKit del agente.")
         await self._shutdown_session()
 

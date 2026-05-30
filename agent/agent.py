@@ -37,8 +37,7 @@ class CivixAgent(Agent):
         self._invalid_district_attempts = 0
         self._silence_timeout_seconds = 4
         self._directory_shutdown_delay = 22
-        self._transfer_shutdown_delay = 8.0
-        self._route_after_greeting_delay = 3.2
+        self._transfer_shutdown_delay = 20.0
 
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
@@ -71,23 +70,24 @@ class CivixAgent(Agent):
     async def on_enter(self) -> None:
         logger.info("Agente activado, enviando saludo inicial...")
         if self._cobertura_detectada and self._distrito:
-            await self.session.generate_reply(
+            await self._speak(
                 instructions=(
                     "Di exactamente: "
                     f"'Te estoy comunicando con la central de serenazgo de {self._distrito}. "
                     "Mantente en línea, por favor.'"
-                )
+                ),
+                allow_interruptions=False,
             )
-            await asyncio.sleep(self._route_after_greeting_delay)
             resultado = await self._transferir_llamada_impl(self._distrito, armar_silencio_en_error=False)
             if not self._transfer_done and resultado:
-                await self.session.generate_reply(instructions=f"Di exactamente: '{resultado}'")
+                await self._speak(instructions=f"Di exactamente: '{resultado}'", allow_interruptions=False)
                 if not self._closed:
                     self._arm_silence_timer()
             return
 
-        await self.session.generate_reply(
-            instructions="Di INMEDIATAMENTE tu primer mensaje exacto y pregunta a qué central de serenazgo desea comunicarse."
+        await self._speak(
+            instructions="Di INMEDIATAMENTE tu primer mensaje exacto y pregunta a qué central de serenazgo desea comunicarse.",
+            allow_interruptions=False,
         )
         self._arm_silence_timer()
 
@@ -105,6 +105,24 @@ class CivixAgent(Agent):
         if len(self._tenants_disponibles) == 1:
             return self._tenants_disponibles[0]
         return ", ".join(self._tenants_disponibles[:-1]) + " o " + self._tenants_disponibles[-1]
+
+    async def _speak(self, instructions: str, allow_interruptions: bool = False) -> None:
+        try:
+            handle = self.session.generate_reply(
+                instructions=instructions,
+                allow_interruptions=allow_interruptions,
+            )
+        except TypeError:
+            handle = self.session.generate_reply(instructions=instructions)
+
+        if inspect.isawaitable(handle):
+            handle = await handle
+
+        wait_for_playout = getattr(handle, "wait_for_playout", None)
+        if callable(wait_for_playout):
+            result = wait_for_playout()
+            if inspect.isawaitable(result):
+                await result
 
     def _arm_silence_timer(self) -> None:
         self._cancel_silence_timer()
@@ -132,7 +150,7 @@ class CivixAgent(Agent):
                     prompt = (
                         "No escuché tu respuesta. ¿A qué central de serenazgo deseas comunicarte?"
                     )
-                await self.session.generate_reply(instructions=f"Di exactamente: '{prompt}'")
+                await self._speak(instructions=f"Di exactamente: '{prompt}'", allow_interruptions=False)
                 self._arm_silence_timer()
                 return
 
@@ -151,9 +169,7 @@ class CivixAgent(Agent):
         self._closed = True
         self._cancel_silence_timer()
         try:
-            await self.session.generate_reply(
-                instructions=f"Di exactamente: '{mensaje}'"
-            )
+            await self._speak(instructions=f"Di exactamente: '{mensaje}'", allow_interruptions=False)
         except Exception as e:
             logger.warning(f"No se pudo anunciar cierre de llamada: {e}")
 

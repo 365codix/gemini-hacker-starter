@@ -37,6 +37,7 @@ class CivixAgent(Agent):
         self._invalid_district_attempts = 0
         self._silence_timeout_seconds = 4
         self._directory_shutdown_delay = 22
+        self._transfer_shutdown_delay = 8.0
 
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
@@ -248,7 +249,7 @@ class CivixAgent(Agent):
             return "Error del sistema al intentar transferir la llamada. Pidele al usuario que intente de nuevo en un momento."
 
     async def _shutdown_after_transfer(self) -> None:
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(self._transfer_shutdown_delay)
         logger.info("Transferencia completada; cerrando sesion Gemini/LiveKit del agente.")
         await self._shutdown_session()
 

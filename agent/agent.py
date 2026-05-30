@@ -38,6 +38,7 @@ class CivixAgent(Agent):
         self._silence_timeout_seconds = 4
         self._directory_shutdown_delay = 22
         self._transfer_shutdown_delay = 8.0
+        self._route_after_greeting_delay = 3.2
 
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
@@ -77,6 +78,7 @@ class CivixAgent(Agent):
                     "Mantente en línea, por favor.'"
                 )
             )
+            await asyncio.sleep(self._route_after_greeting_delay)
             resultado = await self._transferir_llamada_impl(self._distrito, armar_silencio_en_error=False)
             if not self._transfer_done and resultado:
                 await self.session.generate_reply(instructions=f"Di exactamente: '{resultado}'")

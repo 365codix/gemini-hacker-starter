@@ -38,6 +38,7 @@ class CivixAgent(Agent):
         self._silence_timeout_seconds = 4
         self._directory_shutdown_delay = 22
         self._transfer_shutdown_delay = 20.0
+        self._minimum_greeting_playout_seconds = 3.0
 
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
@@ -73,6 +74,7 @@ class CivixAgent(Agent):
             await self._say_exact(
                 f"Te estoy comunicando con la central de serenazgo de {self._distrito}. Mantente en línea, por favor."
             )
+            await asyncio.sleep(self._minimum_greeting_playout_seconds)
             resultado = await self._transferir_llamada_impl(self._distrito, armar_silencio_en_error=False)
             if not self._transfer_done and resultado:
                 await self._say_exact(resultado)

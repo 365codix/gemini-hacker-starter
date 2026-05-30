@@ -41,7 +41,7 @@ class CivixAgent(Agent):
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
             first_prompt = (
-                f"Te estoy comunicando con la central de serenazgo de {destino_detectado}. Mantente en línea, por favor."
+                f"Hola soy Civix y te estoy comunicando con la central de serenazgo de {destino_detectado}. Mantente en línea, por favor."
             )
             routing_rule = (
                 f"El distrito ya fue confirmado antes de iniciar la llamada. No preguntes si desea cambiar de distrito. "

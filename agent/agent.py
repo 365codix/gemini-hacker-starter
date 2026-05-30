@@ -41,11 +41,11 @@ class CivixAgent(Agent):
         destino_detectado = self._distrito if self._cobertura_detectada and self._distrito else ""
         if destino_detectado:
             first_prompt = (
-                f"Hola, Seguridad Ciudadana de {destino_detectado}. ¿Te transfiero aquí o a otro distrito?"
+                f"Te estoy comunicando con la central de serenazgo de {destino_detectado}. Mantente en línea, por favor."
             )
             routing_rule = (
-                f"Si acepta esta central, llama `transferir_llamada` con '{destino_detectado}'. "
-                "Si pide otro distrito, llama `transferir_llamada` con el distrito que diga el ciudadano."
+                f"El distrito ya fue confirmado antes de iniciar la llamada. No preguntes si desea cambiar de distrito. "
+                f"El sistema transferirá automáticamente a '{destino_detectado}'."
             )
         else:
             first_prompt = (
@@ -59,7 +59,7 @@ class CivixAgent(Agent):
             f"{routing_rule} "
             "Si el backend devuelve telefonos de referencia, dicta los numeros lentamente y avisa que no puedes transferir a ese distrito por ahora. "
             "Si el backend indica distrito no disponible sin telefonos, dilo brevemente y pregunta si desea otra central. "
-            "Si el ciudadano no responde a la pregunta de transferencia, se le repreguntará una sola vez y luego el sistema cerrará la llamada. "
+            "Si se tuvo que preguntar por distrito y el ciudadano no responde, se le repreguntará una sola vez y luego el sistema cerrará la llamada. "
             "Responde siempre directo al grano, muy corto y con ritmo rápido. "
             "Después de usar `transferir_llamada`, no sigas conversando ni agregues instrucciones nuevas."
         )
@@ -68,8 +68,23 @@ class CivixAgent(Agent):
 
     async def on_enter(self) -> None:
         logger.info("Agente activado, enviando saludo inicial...")
+        if self._cobertura_detectada and self._distrito:
+            await self.session.generate_reply(
+                instructions=(
+                    "Di exactamente: "
+                    f"'Te estoy comunicando con la central de serenazgo de {self._distrito}. "
+                    "Mantente en línea, por favor.'"
+                )
+            )
+            resultado = await self._transferir_llamada_impl(self._distrito, armar_silencio_en_error=False)
+            if not self._transfer_done and resultado:
+                await self.session.generate_reply(instructions=f"Di exactamente: '{resultado}'")
+                if not self._closed:
+                    self._arm_silence_timer()
+            return
+
         await self.session.generate_reply(
-            instructions="Di INMEDIATAMENTE tu primer mensaje exacto y haz la pregunta de transferencia."
+            instructions="Di INMEDIATAMENTE tu primer mensaje exacto y pregunta a qué central de serenazgo desea comunicarse."
         )
         self._arm_silence_timer()
 
@@ -108,7 +123,7 @@ class CivixAgent(Agent):
                 self._silence_prompts += 1
                 if self._cobertura_detectada and self._distrito:
                     prompt = (
-                        f"No escuché tu respuesta. ¿Te transfiero a {self._distrito} o a otro distrito?"
+                        f"Te estoy transfiriendo a {self._distrito}. Mantente en línea, por favor."
                     )
                 else:
                     prompt = (
@@ -163,6 +178,9 @@ class CivixAgent(Agent):
         distrito: Annotated[str, "Nombre exacto de un distrito disponible al que se transferira la llamada."],
     ) -> str:
         """Transfiere la llamada a una central disponible. Solo debe usarse con distritos disponibles."""
+        return await self._transferir_llamada_impl(distrito)
+
+    async def _transferir_llamada_impl(self, distrito: str, armar_silencio_en_error: bool = True) -> str:
         self._cancel_silence_timer()
         logger.info(f"Intentando transferir llamada al distrito: {distrito} desde el tenant: {self._tenant_id}")
         try:
@@ -193,8 +211,8 @@ class CivixAgent(Agent):
                             asyncio.create_task(self._shutdown_after_directory())
                             return (
                                 f"No puedo transferirte a {distrito_ref}. "
-                                f"Anota estos telefonos: {numeros}. "
-                                "Debes llamar directamente. Luego despídete."
+                                f"Te envié los teléfonos de referencia al chat y también te los dicto: {numeros}. "
+                                "Debes llamar directamente. Luego me despediré."
                             )
 
                         self._invalid_district_attempts += 1
@@ -207,7 +225,8 @@ class CivixAgent(Agent):
                                 "Ese distrito no esta disponible en la plataforma. "
                                 "Indica que se cerrara la llamada y no hagas mas preguntas."
                             )
-                        self._arm_silence_timer()
+                        if armar_silencio_en_error:
+                            self._arm_silence_timer()
                         return (
                             f"Ese distrito no esta disponible en la plataforma. "
                             "Pregunta si desea intentar con otra central."
@@ -215,7 +234,8 @@ class CivixAgent(Agent):
 
                     if resp.status >= 400:
                         logger.warning(f"Backend no acepto la transferencia: {body_text}")
-                        self._arm_silence_timer()
+                        if armar_silencio_en_error:
+                            self._arm_silence_timer()
                         return "No pude ubicar la llamada activa. Pide al usuario que vuelva a iniciar la llamada."
 
             self._transfer_done = True
@@ -223,7 +243,8 @@ class CivixAgent(Agent):
             return "Transferencia registrada. No digas nada mas y finaliza la conversacion."
         except Exception as e:
             logger.error(f"Error transfiriendo: {e}")
-            self._arm_silence_timer()
+            if armar_silencio_en_error:
+                self._arm_silence_timer()
             return "Error del sistema al intentar transferir la llamada. Pidele al usuario que intente de nuevo en un momento."
 
     async def _shutdown_after_transfer(self) -> None:
